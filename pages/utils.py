@@ -1,10 +1,4 @@
 # _*_ coding: utf-8 _*_
-"""
-@File       : data_method.py
-@Author     : Tao Siyuan
-@Date       : 2022/8/6
-@Desc       :...
-"""
 import numpy as np
 from pyecharts.charts import Bar
 from pyecharts import options as opts

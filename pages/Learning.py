@@ -1,10 +1,4 @@
 # _*_ coding: utf-8 _*_
-"""
-@File       : Learning.py
-@Author     : Tao Siyuan
-@Date       : 2022/8/6
-@Desc       :...
-"""
 import streamlit as st
 import streamlit_echarts as st_echarts
 import pandas as pd
