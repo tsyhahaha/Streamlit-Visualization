@@ -1,5 +1,9 @@
 streamlit
+streamlit_lottie
+streamlit_echarts
 pandas
 numpy
 keras
 tensorflow
+scikit-learn
+pyecharts
