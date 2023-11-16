@@ -9,7 +9,7 @@ import streamlit as st
 import streamlit_echarts as st_echarts
 import pandas as pd
 from pyecharts.globals import ThemeType
-from pages.data_method import get_chart
+from pages.utils import get_chart
 import os
 from sklearn.ensemble import RandomForestClassifier
 import numpy as np
@@ -19,13 +19,16 @@ from pyecharts import options as opts
 
 def run():
     st.header('Learning infomation')
-    f = None
-    if os.path.exists('data.csv'):
-        f = pd.read_csv('data.csv')
-    if f is None:
-        st.warning("**Please upload a csv file**")
+    if st.session_state['base_file'] is None:
+        f = st.file_uploader('upload a csv file here', type='csv')
+        if f is None:
+            st.warning("**Please upload a csv file**")
+        else:
+            st.session_state['base_file'] = pd.read_csv(f)
+            st.write('**data process successfully!**')
+            st.experimental_rerun()
     else:
-        content = f
+        content = st.session_state['base_file'].copy(deep=True)
 
         grade_id = st.selectbox(
             'GradeId',

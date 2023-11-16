@@ -9,7 +9,6 @@ import streamlit as st
 import requests
 from streamlit_lottie import st_lottie
 import pandas as pd
-import os
 
 
 def load_lottie(url):
@@ -20,10 +19,6 @@ def load_lottie(url):
 
 
 def run():
-    if os.path.exists("data.csv"):
-        os.remove("data.csv")
-    if os.path.exists("group_result.csv"):
-        os.remove("group_result.csv")
     st.write('# Home')
     lottie_back = load_lottie('https://assets3.lottiefiles.com/private_files/lf30_cldvedro.json')
     lottie_study = load_lottie('https://assets8.lottiefiles.com/packages/lf20_ttnc5lln.json')
@@ -34,8 +29,7 @@ def run():
     if f is None:
         st.warning("**Please upload a csv file**")
     else:
-        text = pd.read_csv(f)
-        text.to_csv('data.csv', index=None)
+        st.session_state['base_file'] = pd.read_csv(f)
         st.write('**data process successfully!**')
 
     st.header("Background Information")
@@ -86,7 +80,3 @@ def run():
                 st.text_input(label='your telephone')
                 st.text_input(label='your suggest')
                 st.form_submit_button('submit')
-    # try:
-        # thread.join()
-    # except RuntimeError:
-    #     print('Thread hadn\'t begin')

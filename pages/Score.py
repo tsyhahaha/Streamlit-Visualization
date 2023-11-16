@@ -1,11 +1,6 @@
 # _*_ coding: utf-8 _*_
-"""
-@File       : Score.py
-@Author     : Tao Siyuan
-@Date       : 2022/8/6
-@Desc       :...
-"""
 import json
+import copy
 import os
 
 import streamlit as st
@@ -14,19 +9,30 @@ from pyecharts import options as opts
 from pyecharts.charts import Bar
 from pyecharts.globals import ThemeType
 import pandas as pd
-
 import numpy as np
+
+from keras.models import load_model
+import tensorflow as tf
 
 
 def run():
+    try:
+        model = load_model('data/model.keras')
+        model_exists = True
+    except IOError:
+        print('model path doesn\'t exist!')
+        model_exists = False
     st.header('Score infomation')
-    f = None
-    if os.path.exists('data.csv'):
-        f = pd.read_csv('data.csv')
-    if f is None:
-        st.warning("**Please upload a csv file**")
+    if st.session_state['base_file'] is None:
+        f = st.file_uploader('upload a csv file here', type='csv', key='base')
+        if f is None:
+            st.warning("**Please upload a csv file**")
+        else:
+            st.session_state['base_file'] = pd.read_csv(f)
+            st.write('**data process successfully!**')
+            st.experimental_rerun()
     else:
-        str_mappers = f
+        content = st.session_state['base_file'].copy(deep=True)
 
         grade_id = st.selectbox(
             'GradeId',
@@ -44,7 +50,7 @@ def run():
         filter_dict = {}
         for element in filter_elements:
             option = st.selectbox(element,
-                                  list(set(str_mappers[element])))
+                                  list(set(content[element])))
             filter_dict[element] = option
 
         st.write('You selected:')
@@ -57,12 +63,12 @@ def run():
             y_data = []
             for i in range(len(x_data)):
                 sum = 0
-                for j in range(len(str_mappers[theme])):
-                    if int(str_mappers[theme][j]) == (x_data[i] - 40) // 20 \
-                            and (int(str_mappers['GradeID'][j][2:4]) == grade_id or grade_id == 'All'):
+                for j in range(len(content[theme])):
+                    if int(content[theme][j]) == (x_data[i] - 40) // 20 \
+                            and (int(content['GradeID'][j][2:4]) == grade_id or grade_id == 'All'):
                         need_to_filter = False
                         for key in filter_dict.keys():
-                            if str_mappers[key][j] != filter_dict[key]:
+                            if content[key][j] != filter_dict[key]:
                                 need_to_filter = True
                                 break
 
@@ -86,22 +92,22 @@ def run():
             )
             st.download_button('download', chart.render())
 
+    if model_exists:
         st.header("Score prediction")
         with st.container():
             try:
-                f = open('data.json', 'r')
+                f = open('data/eval_result.json', 'r')
                 right_ratio = json.load(f)['right']
             except EOFError:
                 print('error: data.json doesn\'t exist')
             st.markdown(
                 "##### <center><font face=\"New Times Roman\" size=2>Currently, the prediction "
-                "accuracy in the "
-                "validation set is: " + str(right_ratio * 100) + "%</font></center>", unsafe_allow_html=True)
+                "Current Accuracy: "+ str(right_ratio * 100) + "%</font></center>", unsafe_allow_html=True)
         # with st.container():
         st.markdown('##### single prediction')
         with st.form(key='my_form'):
             info = []
-            f = open('mappers.json', 'r').read()
+            f = open('data/mappers.json', 'r').read()
             str_mappers = json.loads(f)
             dirt = str_mappers.keys()
             for key in dirt:
@@ -116,29 +122,44 @@ def run():
                 temp_input = str_mappers[key][st.selectbox(key, selection)]
                 info.append(temp_input)
             flag = st.form_submit_button(label='Submit')
-        st.markdown('---')
         info = np.array(info).reshape(1, -1)
         if flag:
-            st.markdown("#### the prediction for class is: " + str(result))
-            final = result * 20 + 40
+            result = model(info)
+            rank = tf.argmax(result).numpy()[0] + 1
+            st.markdown("**prediction result**")
+            final = (rank * 20 + 40.0) / 100
             st.progress(final)
-            if result == 1:
-                st.markdown("your score is about 60, maybe you need try to ask for help with study.")
-            elif result == 2:
-                st.markdown("your score is about 80, and it's average. Keep up the good work.")
-            elif result == 3:
-                st.markdown("your score is nearly 100, excellent!")
-
+            if rank == 1:
+                st.markdown("your score is about **60**, maybe you need try to ask for help with study.")
+            elif rank == 2:
+                st.markdown("your score is about **80**, and it's average. Keep up the good work.")
+            elif rank == 3:
+                st.markdown("your score is nearly **100**, excellent!")
+        
+        st.markdown('---')
         st.markdown('##### group prediction')
-        f = st.file_uploader('upload a csv file here', type='csv')
+        f = st.file_uploader('upload a csv file here', type='csv', key='group')
         if f is None:
             st.warning("**Please upload a csv file and be aware of the format---the same of the "
-                       "input but without the 'class' colunm!**")
+                       "input!**")
         else:
             st.write('**data read successfully!**')
             content = pd.read_csv(f)
-            content_save = content.copy(deep=True)
-            if len(content.columns) == 16:
+            format_flag = True
+            for column in dirt:
+                if column != 'Class' and column not in content.columns:
+                    format_flag = False
+                    break
+            if not format_flag:
+                st.warning("Please check your file format!")
+            else:
+                content_save = content.copy(deep=True)
+                required_columns = copy.deepcopy(list(dirt))
+                required_columns.remove('Class')
+                content = content[required_columns]
+                if 'Class' in content.columns:
+                    del content['Class']
+
                 headers = content.columns
                 for header in headers:
                     if header not in ['raisedhands', 'VisitedResources', 'AnnouncementsView', 'Discussion', 'Class']:
@@ -147,13 +168,13 @@ def run():
                 pred_re = []
                 for line in pred:
                     line = list(line)
-                    pred_re.append(line.index(max(line)))
-                content_save['Class'] = pred_re
-                content.to_csv('result.csv')
+                    pred_re.append(line.index(max(line)) + 1)
+                content_save['Class_pred'] = pred_re
+                content.to_csv('data/result.csv')
                 st.markdown('**Please click the download button to get the result**')
                 st.download_button(
                     label='download group prediction result',
                     data=content_save.to_csv(),
-                    file_name='result.csv',
+                    file_name='group_pred_result.csv',
                     mime='text/csv'
                 )
